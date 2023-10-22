@@ -54,7 +54,7 @@ body {
   max-width: 42rem;
   background-color: var(--color-background-500);
   border-radius: 0.9rem;
-  /* overflow: scroll; */
+  overflow: scroll;
   position: relative;
 }
 
@@ -337,6 +337,34 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+/* Remove default scrollbars */
+::-webkit-scrollbar {
+  width: 12px; /* Adjust the width as needed */
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+  background: transparent; /* Change this to the desired background color */
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+  background: var(
+    --color-background-500
+  ); /* Change this to the desired scrollbar color */
+  border-radius: 6px; /* Adjust the radius as needed */
+}
+/* Remove scrollbar corner (resizing grip) */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: var(
+    --color-background-100
+  ); /* Change this to the desired hover color */
 }
 
 /*

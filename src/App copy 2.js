@@ -1,29 +1,58 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import StarRating from "./StarRating";
-import useMovies from "./useMovies";
-import useLocalStorageState from "./useLocalStorageState";
-import useKey from "./useKey";
 
-const KEY = "8eedd076";
+// const tempMovieData = [
+//   {
+//     imdbID: "tt1375666",
+//     Title: "Inception",
+//     Year: "2010",
+//     Poster:
+//       "https://m.media-amazon.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1_SX300.jpg",
+//   },
+//   {
+//     imdbID: "tt0133093",
+//     Title: "The Matrix",
+//     Year: "1999",
+//     Poster:
+//       "https://m.media-amazon.com/images/M/MV5BNzQzOTk3OTAtNDQ0Zi00ZTVkLWI0MTEtMDllZjNkYzNjNTc4L2ltYWdlXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_SX300.jpg",
+//   },
+//   {
+//     imdbID: "tt6751668",
+//     Title: "Parasite",
+//     Year: "2019",
+//     Poster:
+//       "https://m.media-amazon.com/images/M/MV5BYWZjMjk3ZTItODQ2ZC00NTY5LWE0ZDYtZTI3MjcwN2Q5NTVkXkEyXkFqcGdeQXVyODk4OTc3MTY@._V1_SX300.jpg",
+//   },
+// ];
+
+// const tempWatchedData = [
+//   {
+//     imdbID: "tt1375666",
+//     Title: "Inception",
+//     Year: "2010",
+//     Poster:
+//       "https://m.media-amazon.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1_SX300.jpg",
+//     runtime: 148,
+//     imdbRating: 8.8,
+//     userRating: 10,
+//   },
+//   {
+//     imdbID: "tt0088763",
+//     Title: "Back to the Future",
+//     Year: "1985",
+//     Poster:
+//       "https://m.media-amazon.com/images/M/MV5BZmU0M2Y1OGUtZjIxNi00ZjBkLTg1MjgtOWIyNThiZWIwYjRiXkEyXkFqcGdeQXVyMTQxNzMzNDI@._V1_SX300.jpg",
+//     runtime: 116,
+//     imdbRating: 8.5,
+//     userRating: 9,
+//   },
+// ];
 //Components:
 const NavBar = ({ children }) => {
   return <nav className="nav-bar">{children}</nav>;
 };
 
 const SearchBar = ({ query, setQuery }) => {
-  const inputEl = useRef(null); //initial value of refs for dom elements is usually null. Ref is like using querySelector for elements. They are used to store value that changes across renders but they are remembered across renders but don't trigger re-render for a component
-  useEffect(() => {
-    const callback = (e) => {
-      if (document.activeElement === inputEl.current) return;
-      if (e.code === "Enter") {
-        inputEl.current.focus();
-        setQuery("");
-      }
-    };
-    document.addEventListener("keydown", callback);
-    return () => document.addEventListener("keydown", callback);
-    //focus function makes the search bar in focus
-  }, [setQuery]); //3rd step-> using th ref (on mount in this case). useEffect hook works after the dom has been loaded so it's a perfect place to make usage of it with refs (which get added to the dom element also after the dom loaded). Connecting the reference (ref) with the element below, passing it as prop:
   return (
     <input
       className="search"
@@ -31,7 +60,6 @@ const SearchBar = ({ query, setQuery }) => {
       placeholder="Search movies..."
       value={query}
       onChange={(e) => setQuery(e.target.value)}
-      ref={inputEl}
     />
   );
 };
@@ -63,36 +91,71 @@ const average = (arr) =>
   arr.reduce((acc, cur, i, arr) => acc + cur / arr.length, 0);
 
 /* App is structural component */
-
+const KEY = "8eedd076";
 export default function App() {
-  // const [watched, setWatched] = useState([]);
-  const [watched, setWatched] = useLocalStorageState([], "watched"); //extracted to custom hook
+  const [movies, setMovies] = useState([]);
+  const [watched, setWatched] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(""); //If there will be any error coming from the fetchMovies async function it will be stored in error and displayed
   const [query, setQuery] = useState(""); //Lifted this state up because we want to use the query coming from the SearchBar componenent to fetch data here in App component
   //This API call is not allowed in React, because it's producing side effect in the render logic (no side effects allowed).
   const [selectedId, setSelectedId] = useState(null);
-  const { movies, isLoading, error } = useMovies(query);
   // fetch(`http://www.omdbapi.com/?apikey=${KEY}&s=interstellar`)
   //   .then((res) => res.json())
   //   .then((data) => setMovies(data.Search)) //This will create infinite loop because the state change will trigger re-render which means that the compnent function will be called again with will lead to fetching agaian and again creating ininite loop and firing tons of requests
   //Also if we will try to update the state from render logic directly then it will cause the same effect of infinite loop, that's why we update state inside event handlers only:
   // setWatched([])
   //        `http://www.omdbapi.com/?apikey=${KEY}&s=${query}`
-
   const handleSelectedMovie = (id) => {
     setSelectedId((currentId) => (currentId === id ? null : id));
   };
-  function handleCloseMovie() {
+  const handleCloseMovie = () => {
     setSelectedId(null);
-  }
+  };
   const handleAddWatched = (movie) => {
     setWatched((watched) => [...watched, movie]);
-    //if we want to store the list of watched movies in the local storage we need to make sure we still work with up-to-date state because the setWatched was just updated (state updates are asynchronous)
-    // localStorage.setItem("watched", JSON.stringify([...watched, movie]));
   };
   const handleDeleteWatched = (id) => {
     setWatched((watched) => watched.filter((movie) => movie.imdbID !== id));
   };
 
+  useEffect(() => {
+    const controller = new AbortController(); //part of browser API, will use in the clean up function. We want only the last request to be the actuall request (not every key press)
+    const fetchMovies = async () => {
+      try {
+        setIsLoading(true);
+        setError("");
+        const result = await fetch(
+          `http://www.omdbapi.com/?apikey=${KEY}&s=${query}`,
+          { signal: controller.signal }
+        ); //connecting th abort controller with the api call
+        if (!result.ok) throw new Error("Something went wrong");
+        const data = await result.json();
+        if (data.Response === "False") throw new Error("Movie not found");
+        setMovies(data.Search);
+        setError("");
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          setError(err.message); //Setting the error only if it's not the abort error (cleanup function)
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    // If the query lenght is smaller than 3 then dont search for movie and treset the movies array and error
+    if (query.length < 3) {
+      setMovies([]);
+      setError("");
+      return;
+    }
+    handleCloseMovie(); //before we search for a new movie we want to close the MovieDetails component
+    fetchMovies();
+    //after each re-render this function will be called. This means the controller will abort the current fetch request. The problem is that as soon as a request gets cancelled then js sees it as an error
+    return () => {
+      controller.abort();
+    };
+  }, [query]); //by including query in the dependencies array whenever it changes the effect will run again, in our case it means that a new request is gonna be made to the movies API
+  //When dependecies array is empty then it means that the side effect should happen only at mount (first render). useEffect hook ensures that the side effect will happen after the initial render, without creating infinite loop.
   return (
     <>
       <NavBar movies={movies}>
@@ -159,6 +222,28 @@ const Box = ({ children }) => {
   );
 };
 
+/* Statefull component */
+// const WatchedBox = () => {
+//   const [isOpen2, setIsOpen2] = useState(true);
+//   const [watched, setWatched] = useState(tempWatchedData);
+
+//   return (
+//     <div className="box">
+//       <button
+//         className="btn-toggle"
+//         onClick={() => setIsOpen2((open) => !open)}
+//       >
+//         {isOpen2 ? "–" : "+"}
+//       </button>
+//       {isOpen2 && (
+//         <>
+//           <Summary watched={watched} />
+//           <WatchedMoviesList watched={watched} />
+//         </>
+//       )}
+//     </div>
+//   );
+// };
 /*MoviesList is statefull component */
 const MoviesList = ({ movies, handleSelectedMovie }) => {
   return (
@@ -193,12 +278,6 @@ const MovieDetail = ({ selectedId, onCloseMovie, onAddWatched, watched }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [userRating, setUserRating] = useState("");
 
-  const countRef = useRef(0);
-
-  useEffect(() => {
-    if (userRating) countRef.current = countRef.current + 1;
-  }, [userRating]); //we're using useEffect hook to update the current property of countRef because updating ref directly in the render logc is forbidden
-
   const isWatched = watched.map((movie) => movie.imdbID).includes(selectedId);
   const watchedUserRating = watched.find(
     (movie) => movie.imdbID === selectedId
@@ -224,14 +303,23 @@ const MovieDetail = ({ selectedId, onCloseMovie, onAddWatched, watched }) => {
       imdbRating: Number(imdbRating),
       runtime: Number(runtime.split(" ").at(0)),
       userRating,
-      countRatungDecisions: countRef.current,
     };
     onAddWatched(newWatchedMovie);
     onCloseMovie();
   };
 
-  useKey("Escape", onCloseMovie);
-
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.code === "Escape") {
+        onCloseMovie();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+    //We remove the event listener because we don't want to have mahy event listeners. When the component unmounts it should remove his event listener
+  }, [onCloseMovie]); //to listen for the key down effect we need to use useEffect hook because it's a side effect (we are touching the DOM)
   useEffect(() => {
     const getMovieDetails = async () => {
       setIsLoading(true);
